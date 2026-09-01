@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!--
+    Bu proje bir class library'dir (Microsoft.NET.Sdk.Web değil), bu yüzden
+    HttpContext, IExceptionHandler gibi ASP.NET Core tiplerine erişmek için
+    paylaşılan çalışma zamanı framework'üne (shared framework) referans
+    vermemiz gerekir. Eski "Microsoft.AspNetCore.Http.Abstractions" (2.2.0)
+    gibi NuGet paketleri .NET Core 3.0 öncesi modelden kalmadır, .NET 10 ile
+    uyumlu değildir ve IExceptionHandler'ı (ASP.NET Core 8+ ile geldi) içermez.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Modül 4: CQRS -->
+    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
+  </ItemGroup>
+
+</Project>

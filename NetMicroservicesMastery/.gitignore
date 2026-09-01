@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+.vs/
+*.suo
+
+## Docker
+.env
+
+## Rider/VSCode
+.idea/
+.vscode/
+
+## Loglar
+*.log

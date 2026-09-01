@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Modül 3: MassTransit + Kafka -->
+    <PackageReference Include="MassTransit" Version="8.3.4" />
+    <PackageReference Include="MassTransit.Kafka" Version="8.3.4" />
+    <!-- Modül 4: Saga Orchestration (State Machine, RabbitMQ transport'ta native destekli) -->
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.4" />
+    <!-- Modül 4: Outbox Pattern -->
+    <PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.3.4" />
+    <!-- IServiceCollection/IConfiguration icin (bu proje ASP.NET Core'a bagimli olmasin diye hafif soyutlama) -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BuildingBlocks.Common\BuildingBlocks.Common.csproj" />
+  </ItemGroup>
+
+</Project>

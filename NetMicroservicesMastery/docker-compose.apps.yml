@@ -1,0 +1,106 @@
+name: net-microservices-mastery-apps
+
+# =====================================================================
+# Bu dosya SADECE .NET uygulama servislerini içerir (Order/Payment/Inventory
+# Api, ApiGateway, JobService). Altyapı (Postgres, Redis, Kafka, Vault,
+# Consul, Keycloak, Seq, Prometheus, Grafana, Jaeger, RabbitMQ, RedisInsight,
+# Kafka UI) AYRI olarak "docker-compose.infra.yml" ile yönetilir.
+#
+# Çalıştırma sırası:
+#   1) docker compose -f docker-compose.infra.yml up -d
+#   2) docker compose -f docker-compose.apps.yml up -d --build
+#
+# Her iki dosya da aynı Docker ağını ("neominal-net") kullanır; bu ağın
+# docker-compose.infra.yml içinde "name: neominal-net" ile SABİTLENMİŞ
+# olması gerekir (aksi halde bu dosya ağı bulamaz — bkz. docs/Altyapi-Entegrasyonu.md).
+# =====================================================================
+
+networks:
+  neominal-net:
+    external: true
+
+services:
+
+  order-api:
+    build:
+      context: .
+      dockerfile: src/Services/Order/Order.Api/Dockerfile
+    container_name: nmm-order-api
+    networks:
+      - neominal-net
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+      # Modül 2: Vault dev-mode root token (bkz. docker-compose.infra.yml VAULT_DEV_ROOT_TOKEN_ID)
+      Vault__Token: root
+    ports:
+      - "5001:8080"
+
+  payment-api:
+    build:
+      context: .
+      dockerfile: src/Services/Payment/Payment.Api/Dockerfile
+    container_name: nmm-payment-api
+    networks:
+      - neominal-net
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+      # Modül 2: Vault dev-mode root token (bkz. docker-compose.infra.yml VAULT_DEV_ROOT_TOKEN_ID)
+      Vault__Token: root
+    ports:
+      - "5002:8080"
+
+  inventory-api:
+    build:
+      context: .
+      dockerfile: src/Services/Inventory/Inventory.Api/Dockerfile
+    container_name: nmm-inventory-api
+    networks:
+      - neominal-net
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+      # Modül 2: Vault dev-mode root token (bkz. docker-compose.infra.yml VAULT_DEV_ROOT_TOKEN_ID)
+      Vault__Token: root
+    ports:
+      - "5003:8080"
+
+  saga-api:
+    build:
+      context: .
+      dockerfile: src/Services/Saga/Saga.Api/Dockerfile
+    container_name: nmm-saga-api
+    networks:
+      - neominal-net
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "5004:8080"
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: src/Gateway/ApiGateway/Dockerfile
+    container_name: nmm-api-gateway
+    networks:
+      - neominal-net
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "8080:8080"
+
+  job-service:
+    build:
+      context: .
+      dockerfile: src/BackgroundJobs/JobService/Dockerfile
+    container_name: nmm-job-service
+    networks:
+      - neominal-net
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "5010:8080"

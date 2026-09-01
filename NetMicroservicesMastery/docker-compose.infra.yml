@@ -1,0 +1,335 @@
+name: neominal-microservices-infra
+
+networks:
+  neominal-net:
+    driver: bridge
+    # .NET servislerinin (docker-compose.apps.yml) bu ağa "external: true" ile
+    # katılabilmesi için ağ adı burada AÇIKÇA sabitlenmiştir. Bu satır olmadan
+    # Docker Compose, proje adını öne ekleyerek farklı bir ağ adı üretir
+    # (örn. "neominal-microservices-infra_neominal-net") ve apps compose'u
+    # ağı bulamaz.
+    name: neominal-net
+
+volumes:
+  postgres-data:
+  grafana-data:
+  vault-data:
+  seq-data:
+  redisinsight-data:
+  keycloak-data:
+  rabbitmq-data:
+  consul-data:
+
+services:
+
+  # ----------------------------------------------------------------
+  # PostgreSQL - Uygulama veritabanı
+  # ----------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: neominal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: neominal_demo
+      POSTGRES_USER: neominal
+      POSTGRES_PASSWORD: neominal_pass
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Modül 4 - "Database per Service": order_db, payment_db, inventory_db,
+      # hangfire_db veritabanlarını POSTGRES_DB (neominal_demo) yanına EK
+      # olarak oluşturur. Script $POSTGRES_USER'ı (neominal) kullanır, bu
+      # yüzden değişiklik gerektirmez. Bu satır repodan gelir:
+      # NetMicroservicesMastery/infra/postgres/init-multiple-dbs.sh
+      - ./infra/postgres/init-multiple-dbs.sh:/docker-entrypoint-initdb.d/init-multiple-dbs.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neominal -d neominal_demo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Redis - Cache / Distributed Lock
+  # ----------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: neominal-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Kafka (KRaft mode, tek broker - Zookeeper'sız)
+  # ----------------------------------------------------------------
+  kafka:
+    image: apache/kafka:latest
+    container_name: neominal-kafka
+    restart: unless-stopped
+    environment:
+      # KRaft mode için sabit bir cluster id (tek node/dev ortamı için herhangi
+      # geçerli 22 karakterlik bir base64 string yeterlidir).
+      CLUSTER_ID: "4L6g3nShT-eMCtK--X86sw"
+      KAFKA_NODE_ID: "0"
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      # Konteyner içinden erişim (kafka:9092) ve host makineden erişim (localhost:19094) ayrı listener'lar ile sağlanır
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:19094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      # Modül 3 - Partition Key'in gerçekten test edilebilmesi için (1
+      # partition'da tüm mesajlar aynı partition'a düşer, key'in bir önemi
+      # kalmaz) otomatik oluşturulan topic'lerin varsayılan partition
+      # sayısı artırıldı. NOT: Bu ayar sadece BUNDAN SONRA oluşturulacak
+      # yeni topic'leri etkiler — zaten var olan bir topic'in partition
+      # sayısını değiştirmez (bkz. docs/BuildingBlocks.Messaging.md).
+      KAFKA_NUM_PARTITIONS: "3"
+    ports:
+      - "9092:9092"
+      - "19094:9094"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # HashiCorp Vault - Secret Management (DEV MODE - production'da kullanılmaz!)
+  # ----------------------------------------------------------------
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: neominal-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    volumes:
+      - vault-data:/vault/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Seq - Serilog structured log sink + arama arayüzü
+  # ----------------------------------------------------------------
+  seq:
+    image: datalust/seq:latest
+    container_name: neominal-seq
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      # Gerçek bir admin şifresi tanımlanır (bkz. .env dosyası).
+      # Şifre sadece VOLUME BOŞKEN (ilk çalıştırmada) set edilir; sonradan
+      # .env'i değiştirmek mevcut şifreyi güncellemez (bkz. README).
+      SEQ_FIRSTRUN_ADMINPASSWORD: ${SEQ_ADMIN_PASSWORD}
+    ports:
+      - "5341:5341"   # Serilog ingestion endpoint
+      - "8081:80"     # Seq Web UI
+    volumes:
+      - seq-data:/data
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Jaeger - Distributed tracing (OTLP receiver dahil)
+  # ----------------------------------------------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: neominal-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger Web UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Prometheus - Metrik toplama
+  # ----------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: neominal-prometheus
+    restart: unless-stopped
+    volumes:
+      # Repodaki dosya yoluna göre güncellendi (bkz. NetMicroservicesMastery/infra/prometheus/).
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux'ta host.docker.internal çözümlemesi için
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Grafana - Metrik görselleştirme (Prometheus datasource ile)
+  # ----------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: neominal-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # Datasource (Prometheus) ve hazır dashboard otomatik yüklensin diye eklendi
+      # (bkz. NetMicroservicesMastery/infra/grafana/provisioning/ ve
+      # docs/Grafana-Metrik-Dogrulama.md).
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Kafka UI - Topic/mesaj/consumer-group görselleştirme arayüzü
+  # ----------------------------------------------------------------
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    container_name: neominal-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: neominal
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8082:8080"
+    depends_on:
+      - kafka
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # RedisInsight - Redis verisini görsel olarak inceleme arayüzü
+  # ----------------------------------------------------------------
+  redis-ui:
+    image: redis/redisinsight:latest
+    container_name: neominal-redis-ui
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight-data:/data
+    depends_on:
+      - redis
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Keycloak - Identity & Access Management (dev mode)
+  # PROD'da: start-dev yerine "start", HTTPS zorunlu, harici DB (Postgres)
+  # kullanilmali; bu sablonda basitlik icin dev mode + gomulu DB kullanilir.
+  # ----------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1.1
+    container_name: neominal-keycloak
+    restart: unless-stopped
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"   # Admin Console + realm/token endpoint'leri
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      # Modül 2 çalışmasında kullanılacak realm/client tanımlarının otomatik
+      # import edilmesi için eklendi (bkz. NetMicroservicesMastery/infra/keycloak/).
+      # İSTEMİYORSANIZ bu satırı ve aşağıdaki "--import-realm" bayrağını kaldırabilirsiniz;
+      # realm'i o zaman Admin Console'dan (http://localhost:8180) elle oluşturmanız gerekir.
+      - ./infra/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    command:
+      - start-dev
+      - --import-realm
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # HashiCorp Consul - Service Discovery (dev mode)
+  # ----------------------------------------------------------------
+  consul:
+    image: hashicorp/consul:1.19
+    container_name: neominal-consul
+    restart: unless-stopped
+    command: agent -dev -client=0.0.0.0 -data-dir=/consul/data
+    ports:
+      - "8500:8500"      # Web UI + HTTP API
+      - "8600:8600/udp"  # DNS interface
+    volumes:
+      - consul-data:/consul/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8500/v1/status/leader"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # RabbitMQ (+ Management UI, ayni imajin icinde gelir)
+  # ----------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: neominal-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: neominal
+      RABBITMQ_DEFAULT_PASS: neominal_pass
+    ports:
+      # AMQP portu standart olmayan bir host portuna (25672) tasindi -
+      # ayni Postgres/Kafka'da yasadigimiz "guvenlik yazilimi bilinen
+      # portu keser" sorununu bastan onlemek icin (bkz. README notu).
+      - "25672:5672"
+      - "15672:15672"  # Management UI (HTTP, sorunsuz calisir)
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - neominal-net
+
+  # ----------------------------------------------------------------
+  # Nginx - Reverse Proxy (.NET uygulamasının önünde)
+  # ⚠️ NOT: Bu proje API Gateway olarak Nginx yerine YARP kullanıyor
+  # (bkz. src/Gateway/ApiGateway — Modül 2). Bu servis şu an KULLANILMIYOR
+  # ve repoda ./nginx/nginx.conf dosyası da YOK — bu haliyle container
+  # başlatılırsa mount hatası verir. Kullanmayacaksanız bu servisi kaldırın;
+  # kullanmak isterseniz kendi nginx.conf'unuzu ./nginx/ altına ekleyin.
+  # ----------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: neominal-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8090:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux'ta host.docker.internal çözümlemesi için
+    networks:
+      - neominal-net

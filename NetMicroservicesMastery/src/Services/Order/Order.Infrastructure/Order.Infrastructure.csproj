@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!--
+    Modül 4 - OutboxProcessorHostedService (BackgroundService) ve ILogger
+    kullanımı için — bu bir class library olduğundan (Web SDK değil),
+    ASP.NET Core/Hosting tiplerine erişmek için shared framework referansı
+    gereklidir (bkz. COMPILE_FIX_NOTES.md'deki aynı desen).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Persistence -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <!-- Modül 5: Distributed Lock / Redis -->
+    <PackageReference Include="StackExchange.Redis" Version="2.8.24" />
+    <PackageReference Include="RedLock.net" Version="2.3.2" />
+    <!-- Modül 5: Hangfire (JobService projesi de kullanır; Api projesi Dashboard için) -->
+    <PackageReference Include="Hangfire.Core" Version="1.8.14" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
+    <!-- Modül 5: Consul KV (dinamik konfigürasyon) -->
+    <PackageReference Include="Consul" Version="1.7.14.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Order.Domain\Order.Domain.csproj" />
+    <ProjectReference Include="..\Order.Application\Order.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Resilience\BuildingBlocks.Resilience.csproj" />
+  </ItemGroup>
+
+</Project>

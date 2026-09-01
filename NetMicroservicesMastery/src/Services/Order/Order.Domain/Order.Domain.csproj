@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- DomainException için — bu, servisler arası ortak bir çekirdek
+         kavramdır (Modül 1), Domain katmanının ASP.NET Core'a veya başka
+         bir dış bağımlılığa bağımlı olmasına yol açmaz. -->
+    <ProjectReference Include="..\..\..\BuildingBlocks\BuildingBlocks.Common\BuildingBlocks.Common.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,97 @@
+{
+  "realm": "net-microservices-mastery",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "api-gateway",
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "enabled": true,
+      "secret": "api-gateway-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true
+    },
+    {
+      "clientId": "order-service",
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "enabled": true,
+      "secret": "order-service-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "gateway-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "api-gateway",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "payment-service",
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "enabled": true,
+      "secret": "payment-service-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "gateway-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "api-gateway",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "inventory-service",
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "enabled": true,
+      "secret": "inventory-service-secret",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "gateway-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "api-gateway",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "order.write" },
+      { "name": "order.read" },
+      { "name": "payment.write" },
+      { "name": "inventory.write" }
+    ]
+  },
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        { "type": "password", "value": "Test1234!", "temporary": false }
+      ],
+      "realmRoles": ["order.write", "order.read", "payment.write", "inventory.write"]
+    }
+  ]
+}

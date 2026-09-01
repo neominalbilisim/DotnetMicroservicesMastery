@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!--
+    IServiceCollection/IConfiguration/IHostApplicationBuilder gibi hosting
+    tiplerini kullanabilmek için shared framework referansı (bkz.
+    BuildingBlocks.Common açıklaması).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Modül 2: Keycloak / AuthServer (OAuth2 - OpenID Connect) -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <!-- Modül 2: Service Discovery (Consul) -->
+    <PackageReference Include="Consul" Version="1.7.14.7" />
+  </ItemGroup>
+
+</Project>
