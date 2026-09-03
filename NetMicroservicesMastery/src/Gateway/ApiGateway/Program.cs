@@ -58,12 +58,6 @@ builder.Services.AddHostedService<ConsulConfigRefreshService>();
 builder.Services.AddReverseProxy();
 
 // =====================================================================
-// Modül 2: Service Discovery — Consul
-// Gateway, diğer TÜM servisler gibi kendini de Consul'a kaydeder.
-// =====================================================================
-builder.Services.AddConsulServiceDiscovery(builder.Configuration, defaultServiceName: "gateway-service");
-
-// =====================================================================
 // Modül 1: Health Check
 // Gateway'in kendi bağımlılığı (DB/Redis) olmadığından temel bir health
 // check yeterlidir; readiness Consul tarafından bu endpoint üzerinden izlenir.
@@ -78,6 +72,12 @@ builder.Services.AddHealthChecks();
 // (bkz. RedisRateLimitingMiddleware.cs). Kota aşılırsa istek downstream
 // servise HİÇ gitmez, doğrudan 429 döner.
 // =====================================================================
+
+builder.Services.AddSingleton<IConsulClient, ConsulClient>(p => new ConsulClient(consulConfig =>
+{
+  consulConfig.Address = new Uri("http://localhost:8500"); // Local
+  // consulConfig.Address = new Uri("http://consul1:8500"); // Docker Prod
+}));
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     ConnectionMultiplexer.Connect(builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379"));
 

@@ -40,71 +40,59 @@ namespace ApiGateway.Services
 
     public IProxyConfig GetConfig()
     {
-
-
       var routes = new List<Yarp.ReverseProxy.Configuration.RouteConfig>();
-
       var clusters = new List<Yarp.ReverseProxy.Configuration.ClusterConfig>();
 
-      // Consul'dan tüm hizmetleri al
       var services = consulClient.Agent.Services().Result;
-      foreach (var service in services.Response)
+
+      // Bir servisin birden fazla instance olabilir. Bu durumda servis ismlerini grouplayarak cluster'ı tek bir servis isiminden birden fazla destination verecek şekilde çıkarmalyız. 
+      var serviceGroups = services.Response.Values.GroupBy(s => s.Service, StringComparer.OrdinalIgnoreCase);
+
+      foreach (var group in serviceGroups)
       {
-        var serviceId = service.Value.ID;
-        var serviceName = service.Value.Service;
-        var serviceAddress = service.Value.Address;
-        var servicePort = service.Value.Port;
+        var serviceName = group.Key;
 
-        // YARP yapılandırmasına ekle
+       
 
-        // EĞER GELEN SERVİS GATEWAY'İN KENDİSİYSE, BU ADIMI ATLA
-        if (string.Equals(serviceName, "gateway-service", StringComparison.OrdinalIgnoreCase))
-        {
-          continue;
-        }
-
-
+        // 1. Rota Ekleme (Her servis adı için SADECE 1 KERE çalışır)
         routes.Add(new Yarp.ReverseProxy.Configuration.RouteConfig
         {
-          RouteId = serviceId,
-          ClusterId = serviceName,
+          RouteId = $"{serviceName}-route",
+          ClusterId = serviceName, // YARP bu ID'yi cluster ile eşleştirir
           Match = new RouteMatch
           {
             Path = $"/{serviceName}/{{**catch-all}}"
           },
-
-          // PathRemovePrefix transform'u burada tanımlanıyor:
           Transforms = new List<IReadOnlyDictionary<string, string>>
-                    {
-                        new Dictionary<string, string>
-                        {
-                            { "PathRemovePrefix", $"/{serviceName}" }
-                        }
-                    },
-          AuthorizationPolicy = $"{serviceName}"
+            {
+                new Dictionary<string, string>
+                {
+                    { "PathRemovePrefix", $"/{serviceName}" }
+                }
+            }
         });
 
-        var destinationAddress = $"http://{serviceAddress}:{servicePort}"; // Local http://localhost:5001
+        // 2. Destinasyonları (Instance'ları) Toplama
+        var destinations = new Dictionary<string, Yarp.ReverseProxy.Configuration.DestinationConfig>(StringComparer.OrdinalIgnoreCase);
 
-        // var destinationAddress = $"http://{serviceName}:{servicePort}"; // Docker http://api1:5001
+        foreach (var instance in group)
+        {
+          destinations.Add(instance.ID, new Yarp.ReverseProxy.Configuration.DestinationConfig
+          {
+            Address = $"http://{instance.Address}:{instance.Port}"
+          });
+        }
 
-
+        // 3. Cluster Ekleme (Her servis adı için SADECE 1 KERE çalışır)
         clusters.Add(new ClusterConfig
         {
-          ClusterId = serviceName,
-          Destinations = new Dictionary<string, Yarp.ReverseProxy.Configuration.DestinationConfig>
-
-                {
-                    { serviceId, new Yarp.ReverseProxy.Configuration.DestinationConfig { Address = destinationAddress } }
-                }
+          ClusterId = serviceName, // Benzersiz olmak zorundadır
+          LoadBalancingPolicy = "RoundRobin",
+          Destinations = destinations
         });
-
-
       }
 
-      _currentConfig =  new ConsulProxyConfig(routes, clusters);
-
-      return _currentConfig;
+      return new ConsulProxyConfig(routes, clusters);
     }
 
     // Hosted Service'in 15 saniyede bir çağıracağı metod

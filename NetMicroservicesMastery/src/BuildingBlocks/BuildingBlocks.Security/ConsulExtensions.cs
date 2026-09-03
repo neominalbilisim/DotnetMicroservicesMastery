@@ -1,8 +1,9 @@
-using System;
 using Consul;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System;
 
 namespace BuildingBlocks.Security;
 
@@ -46,15 +47,17 @@ public static class ConsulExtensions
             cfg.Address = new Uri(consulAddress);
         }));
 
-        services.AddHostedService(sp => new ConsulRegistrationHostedService(
-            sp.GetRequiredService<IConsulClient>(),
-            serviceId: serviceId,
-            serviceName: serviceName,
-            serviceAddress: serviceAddress,
-            servicePort: servicePort,
-            healthCheckUrl: healthCheckUrl,
-            logger: sp.GetRequiredService<ILogger<ConsulRegistrationHostedService>>()));
+    services.AddHostedService(sp => new ConsulRegistrationHostedService(
+        consulClient: sp.GetRequiredService<IConsulClient>(),
+        serviceId: serviceId,
+        serviceName: serviceName,
+        serviceAddress: serviceAddress,
+        servicePort: servicePort,
+        healthCheckUrl: healthCheckUrl,
+        logger: sp.GetRequiredService<ILogger<ConsulRegistrationHostedService>>(),
+        appLifetime: sp.GetRequiredService<IHostApplicationLifetime>()
+    ));
 
-        return services;
+    return services;
     }
 }

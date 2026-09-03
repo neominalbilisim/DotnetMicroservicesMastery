@@ -23,6 +23,7 @@ using Order.Infrastructure.Configuration;
 using Order.Infrastructure.Messaging;
 using Order.Infrastructure.Persistence;
 using Order.Infrastructure.Repositories;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -84,6 +85,10 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 // YAPMAZ — sadece kendini Consul'a kaydeder.
 // =====================================================================
 builder.Services.AddConsulServiceDiscovery(builder.Configuration, defaultServiceName: "order-service");
+
+
+
+
 
 // =====================================================================
 // Modül 5: Consul KV — Merkezi/Dinamik Konfigürasyon
@@ -213,6 +218,8 @@ builder.Services.AddHealthChecks()
         tags: ["ready"]);
 
 var app = builder.Build();
+
+
 // =====================================================================
 // Modül 4: Veritabanı Şeması Oluşturma
 // Bu proje henüz EF Core Migrations kullanmıyor (basitlik için) — bunun
