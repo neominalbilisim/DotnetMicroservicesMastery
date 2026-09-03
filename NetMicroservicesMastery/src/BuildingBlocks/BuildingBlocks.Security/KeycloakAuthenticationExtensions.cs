@@ -1,9 +1,8 @@
-using System.Security.Claims;
+using ApiGateway.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BuildingBlocks.Security;
@@ -28,6 +27,8 @@ public static class KeycloakAuthenticationExtensions
         var authority = configuration["Keycloak:Authority"];
         var audience = configuration["Keycloak:Audience"];
 
+       
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
@@ -47,36 +48,9 @@ public static class KeycloakAuthenticationExtensions
                     // erişiliyorsa (örn. localhost:8180) issuer uyuşmazlığı yaşanabilir
                     // — bu durumda ValidIssuer'ı appsettings üzerinden açıkça set edin.
                 };
-
-              options.Events = new JwtBearerEvents
-              {
-                  OnTokenValidated = context =>
-                  {
-                      // Token doğrulama başarılı olduğunda loglamak için
-                      var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("KeycloakAuth");
-                      logger.LogInformation("JWT Authentication succeeded for {User}", context.Principal?.Identity?.Name);
-                      return Task.CompletedTask;
-                  },
-
-                OnAuthenticationFailed = context =>
-                  {
-                      // Token doğrulama hatalarını loglamak için
-                      var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("KeycloakAuth");
-                      logger.LogError(context.Exception, "JWT Authentication failed.");
-                      return Task.CompletedTask;
-                  },
-                  OnForbidden = context =>
-                  {
-                      // Yetkisiz erişim hatalarını loglamak için
-                      var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("KeycloakAuth");
-                      logger.LogWarning("Forbidden access to {Path}", context.HttpContext.Request.Path);
-                      return Task.CompletedTask;
-                  }
-
-              };
-
-
             });
+
+        services.AddTransient<IClaimsTransformation, ScopeClaimTransformation>();
 
         return services;
     }

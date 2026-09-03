@@ -1,28 +1,28 @@
+using BuildingBlocks.Common.Exceptions;
+using BuildingBlocks.Common.HealthChecks;
+using BuildingBlocks.Messaging;
+using BuildingBlocks.Messaging.Contracts;
+using BuildingBlocks.Messaging.Contracts.Commands;
+using BuildingBlocks.Messaging.Contracts.Events;
+using BuildingBlocks.Messaging.Contracts.Saga;
+using BuildingBlocks.Observability;
+using BuildingBlocks.Resilience;
+using BuildingBlocks.Security;
+using Consul;
+using MassTransit;
+using MediatR;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Order.Api.Consumers;
 using Order.Application;
 using Order.Application.Abstractions;
 using Order.Application.Commands;
 using Order.Application.Queries;
 using Order.Application.Requests;
-using Order.Infrastructure.Messaging;
-using Order.Infrastructure.Repositories;
 using Order.Infrastructure.Configuration;
-using Order.Api.Consumers;
-using BuildingBlocks.Common.Exceptions;
-using BuildingBlocks.Observability;
-using BuildingBlocks.Messaging.Extensions;
-using Microsoft.EntityFrameworkCore;
+using Order.Infrastructure.Messaging;
 using Order.Infrastructure.Persistence;
-using BuildingBlocks.Common.HealthChecks;
-using BuildingBlocks.Resilience;
-using BuildingBlocks.Security;
-using BuildingBlocks.Messaging;
-using BuildingBlocks.Messaging.Contracts;
-using BuildingBlocks.Messaging.Contracts.Events;
-using BuildingBlocks.Messaging.Contracts.Commands;
-using BuildingBlocks.Messaging.Contracts.Saga;
-using MediatR;
-using MassTransit;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Order.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -213,7 +213,6 @@ builder.Services.AddHealthChecks()
         tags: ["ready"]);
 
 var app = builder.Build();
-
 // =====================================================================
 // Modül 4: Veritabanı Şeması Oluşturma
 // Bu proje henüz EF Core Migrations kullanmıyor (basitlik için) — bunun
@@ -331,7 +330,7 @@ app.MapPost("/submit-order-outbox", async (SubmitOrderRequest request, IMediator
 // =====================================================================
 // Modül 4: CQRS — QUERY endpoint'i
 // =====================================================================
-app.MapGet("/test", async (Guid orderId, IMediator mediator) =>
+app.MapGet("/orders/{orderId:guid}", async (Guid orderId, IMediator mediator) =>
 {
     var order = await mediator.Send(new GetOrderByIdQuery(orderId));
     return order is null ? Results.NotFound() : Results.Ok(order);
@@ -411,21 +410,5 @@ app.MapGet("/debug/outbox", async (OrderDbContext dbContext) =>
 
     return Results.Ok(messages);
 });
-
-// =====================================================================
-// Kafka Topic Initialization
-// Uygulama startup'ında, tüm topic'leri Kafka'da otomatik oluştur.
-// Topic'ler zaten varsa (idempotent) skip edilir.
-// =====================================================================
-await app.InitializeKafkaTopicsAsync(
-    KafkaTopics.OrderCreated,
-    KafkaTopics.ProcessPaymentCommand,
-    KafkaTopics.OrderCreatedDeadLetter,
-    KafkaTopics.OrderSagaStarted,
-    KafkaTopics.InventoryReserved,
-    KafkaTopics.InventoryReservationFailed,
-    KafkaTopics.PaymentCompleted,
-    KafkaTopics.PaymentFailed,
-    KafkaTopics.ReleaseInventoryCommand);
 
 app.Run();
