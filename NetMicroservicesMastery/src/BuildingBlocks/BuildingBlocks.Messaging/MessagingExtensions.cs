@@ -1,4 +1,5 @@
 using System;
+using BuildingBlocks.Messaging.Kafka;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +80,9 @@ public static class MessagingExtensions
                 });
             });
         });
+
+        // Kafka topic initializer'ı DI'ya register et
+        services.AddSingleton<KafkaTopicInitializer>();
 
         return services;
     }

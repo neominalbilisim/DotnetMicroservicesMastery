@@ -1,6 +1,7 @@
 using Payment.Application;
 using BuildingBlocks.Common.Exceptions;
 using BuildingBlocks.Observability;
+using BuildingBlocks.Messaging.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Payment.Infrastructure.Persistence;
 using BuildingBlocks.Common.HealthChecks;
@@ -232,5 +233,15 @@ app.MapPost("/debug/test-idempotency", async (IBus bus) =>
         note = "Aynı MessageId ile 2 kez gönderildi. Payment.Api konsolunu kontrol edin: ilki işlenmeli (🟢), ikincisi ATLANMALI (⏭️)."
     });
 });
+
+// =====================================================================
+// Kafka Topic Initialization
+// Uygulama startup'ında, tüm topic'leri Kafka'da otomatik oluştur.
+// Topic'ler zaten varsa (idempotent) skip edilir.
+// =====================================================================
+await app.InitializeKafkaTopicsAsync(
+    KafkaTopics.ProcessPaymentCommand,
+    KafkaTopics.PaymentCompleted,
+    KafkaTopics.PaymentFailed);
 
 app.Run();

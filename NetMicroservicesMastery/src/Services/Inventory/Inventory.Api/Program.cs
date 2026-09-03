@@ -1,6 +1,7 @@
 using Inventory.Application;
 using BuildingBlocks.Common.Exceptions;
 using BuildingBlocks.Observability;
+using BuildingBlocks.Messaging.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Inventory.Infrastructure.Persistence;
 using BuildingBlocks.Common.HealthChecks;
@@ -250,5 +251,16 @@ app.MapPost("/debug/test-idempotency", async (IBus bus) =>
         note = "Aynı MessageId ile 2 kez gönderildi. Inventory.Api konsolunu kontrol edin: ilki işlenmeli (🟢), ikincisi ATLANMALI (⏭️)."
     });
 });
+
+// =====================================================================
+// Kafka Topic Initialization
+// Uygulama startup'ında, tüm topic'leri Kafka'da otomatik oluştur.
+// Topic'ler zaten varsa (idempotent) skip edilir.
+// =====================================================================
+await app.InitializeKafkaTopicsAsync(
+    KafkaTopics.OrderSagaStarted,
+    KafkaTopics.InventoryReserved,
+    KafkaTopics.InventoryReservationFailed,
+    KafkaTopics.ReleaseInventoryCommand);
 
 app.Run();

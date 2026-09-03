@@ -1,0 +1,44 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  # "jaeger" exporter'ı yeni Collector sürümlerinde kaldırıldı (deprecated & removed).
+  # Jaeger, OTLP'yi 1.35+ sürümlerinden beri native olarak kabul ediyor;
+  # bu yüzden Jaeger'ın kendi OTLP gRPC portuna (container içi 4317) otlp exporter'ıyla gönderiyoruz.
+  # NOT: "otlp" tipi deprecate edildi, yerini "otlp_grpc" aldı (bkz. log uyarısı).
+  otlp_grpc/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  prometheus:
+    # DİKKAT: 8888 KULLANMAYIN — Collector'ın kendi iç telemetri sunucusu
+    # (service::telemetry::metrics) varsayılan olarak 0.0.0.0:8888'i zaten
+    # kullanıyor. Aynı portu burada da vermek "address already in use" hatası
+    # verir. Bu yüzden farklı bir port (8889) kullanıyoruz.
+    endpoint: "0.0.0.0:8889"
+  debug: # "logging" exporter'ı deprecate edildi, yerine "debug" geldi
+    verbosity: detailed
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_grpc/jaeger, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus, debug]

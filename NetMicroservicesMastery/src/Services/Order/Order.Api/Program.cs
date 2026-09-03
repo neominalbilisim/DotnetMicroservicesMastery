@@ -9,6 +9,7 @@ using Order.Infrastructure.Configuration;
 using Order.Api.Consumers;
 using BuildingBlocks.Common.Exceptions;
 using BuildingBlocks.Observability;
+using BuildingBlocks.Messaging.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Order.Infrastructure.Persistence;
 using BuildingBlocks.Common.HealthChecks;
@@ -410,5 +411,21 @@ app.MapGet("/debug/outbox", async (OrderDbContext dbContext) =>
 
     return Results.Ok(messages);
 });
+
+// =====================================================================
+// Kafka Topic Initialization
+// Uygulama startup'ında, tüm topic'leri Kafka'da otomatik oluştur.
+// Topic'ler zaten varsa (idempotent) skip edilir.
+// =====================================================================
+await app.InitializeKafkaTopicsAsync(
+    KafkaTopics.OrderCreated,
+    KafkaTopics.ProcessPaymentCommand,
+    KafkaTopics.OrderCreatedDeadLetter,
+    KafkaTopics.OrderSagaStarted,
+    KafkaTopics.InventoryReserved,
+    KafkaTopics.InventoryReservationFailed,
+    KafkaTopics.PaymentCompleted,
+    KafkaTopics.PaymentFailed,
+    KafkaTopics.ReleaseInventoryCommand);
 
 app.Run();
