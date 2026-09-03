@@ -10,12 +10,17 @@ namespace ApiGateway.Services;
 /// </summary>
 public static class YarpRouteMap
 {
-    public record Mapping(string RouteId, string ClusterId, string PathPattern, string ConsulServiceName);
+    public record Mapping(
+        string RouteId,
+        string ClusterId,
+        string PathPattern,
+        string ConsulServiceName,
+        string? AuthorizationPolicy = null);
 
     public static readonly Mapping[] All =
     [
-        new("order-route", "order-cluster", "/api/orders/{**catch-all}", "order-service"),
-        new("payment-route", "payment-cluster", "/api/payments/{**catch-all}", "payment-service"),
-        new("inventory-route", "inventory-cluster", "/api/inventory/{**catch-all}", "inventory-service"),
+        new("order-route", "order-cluster", "/api/order-service/{**catch-all}", "order-service"),
+        new("payment-route", "payment-cluster", "/api/payment-service/{**catch-all}", "payment-service"),
+        new("inventory-route", "inventory-cluster", "/api/inventory-service/{**catch-all}", "inventory-service"),
     ];
 }

@@ -1,8 +1,11 @@
+using ApiGateway.Authentication;
+using ApiGateway.Extensions;
 using ApiGateway.Services;
 using BuildingBlocks.Common.HealthChecks;
 using BuildingBlocks.Observability;
 using BuildingBlocks.Security;
 using Consul;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using StackExchange.Redis;
 using Yarp.ReverseProxy.Configuration;
@@ -29,6 +32,7 @@ builder.WebHost.ConfigureKestrel(options =>
 // Gateway de dahil TÜM servislerde tracing/log/metric zinciri aktiftir.
 // =====================================================================
 builder.AddServiceObservability(serviceName: "ApiGateway");
+builder.Services.AddTransient<IClaimsTransformation, ScopeClaimTransformation>();
 
 // =====================================================================
 // Modül 2: Merkezi Kimlik Doğrulama — Keycloak (AuthServer)
@@ -36,7 +40,27 @@ builder.AddServiceObservability(serviceName: "ApiGateway");
 // servisler (Order/Payment/Inventory) token doğrulamaz.
 // =====================================================================
 builder.Services.AddKeycloakAuthentication(builder.Configuration);
+//builder.Services.AddTransient<IClaimsTransformation, ScopeClaimTransformation>();
 builder.Services.AddAuthorization();
+
+//builder.Services.AddAuthorization(options =>
+//{
+//  // Order route için özel policy: "order-admin" scope'u gerektirir
+//  //options.AddPolicy("OrderAdmin", policy =>
+//  //    policy
+//  //        .RequireAuthenticatedUser());
+//          //.RequireClaim("scope", "order-admin","email","profile"));
+
+//  options.AddPolicy("PaymentAdmin", policy =>
+//      policy
+//          .RequireAuthenticatedUser()
+//          .RequireClaim("scope", "payment-admin"));
+
+//  options.AddPolicy("InventoryAdmin", policy =>
+//      policy
+//          .RequireAuthenticatedUser()
+//          .RequireClaim("scope", "inventory-admin"));
+//});
 
 // =====================================================================
 // Modül 2: API Gateway İmplementasyonu — YARP + Consul Dinamik Servis Keşfi
@@ -111,11 +135,30 @@ app.MapHealthChecks("/health", new HealthCheckOptions
 
 app.MapGet("/", () => Results.Ok(new { service = "ApiGateway (YARP)", status = "up" }));
 
+// DEBUG: Token claims'lerini kontrol etmek için (GELIŞTIRME AMAÇLI)
+app.MapGet("/debug/claims", (HttpContext context) =>
+{
+    var user = context.User;
+    if (!user.Identity?.IsAuthenticated ?? true)
+    {
+        return Results.BadRequest(new { message = "Not authenticated" });
+    }
+
+    var claims = user.Claims.Select(c => new { c.Type, c.Value }).ToList();
+    return Results.Ok(new
+    {
+        authenticated = user.Identity.IsAuthenticated,
+        name = user.Identity.Name,
+        claims = claims
+    });
+}).RequireAuthorization();
+
 // Modül 2: Proxy edilen TÜM istekler geçerli bir JWT gerektirir
 // (health/root endpoint'leri hariç — onlar yukarıda ayrıca map'lendi).
 // Rate limiting, RedisRateLimitingMiddleware tarafından /api/* için zaten
 // pipeline seviyesinde uygulanıyor (yukarıya bkz.) — endpoint'te ayrıca
 // bir ".RequireRateLimiting()" çağrısına gerek yoktur.
-app.MapReverseProxy().RequireAuthorization();
+// Route-specific authorization: her route için kendi policy'si uygulanır
+var proxyBuilder = app.MapReverseProxy().RequireAuthorization();
 
 app.Run();

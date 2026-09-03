@@ -331,7 +331,7 @@ app.MapPost("/submit-order-outbox", async (SubmitOrderRequest request, IMediator
 // =====================================================================
 // Modül 4: CQRS — QUERY endpoint'i
 // =====================================================================
-app.MapGet("/orders/{orderId:guid}", async (Guid orderId, IMediator mediator) =>
+app.MapGet("/test", async (Guid orderId, IMediator mediator) =>
 {
     var order = await mediator.Send(new GetOrderByIdQuery(orderId));
     return order is null ? Results.NotFound() : Results.Ok(order);
