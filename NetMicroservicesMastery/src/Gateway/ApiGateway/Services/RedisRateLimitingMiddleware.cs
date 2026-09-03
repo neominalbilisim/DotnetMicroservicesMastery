@@ -32,9 +32,9 @@ public class RedisRateLimitingMiddleware(
     IConfiguration configuration,
     ILogger<RedisRateLimitingMiddleware> logger)
 {
-    // KEYS[1] = redis key, ARGV[1] = pencere süresi (saniye)
-    // Dönüş: { istek_sayaci, kalan_ttl_saniye }
-    private const string FixedWindowLuaScript = """
+  // Betik, belirli bir anahtarın (örneğin bir kullanıcı ID'si veya IP adresi) belirli bir süre zarfında kaç kez istek attığını hesaplar:
+  // Lua betikleri Redis motorunda atomik (bölünemez tek bir işlem) olarak çalıştığı için eşzamanlılık (concurrency) sorunlarını tamamen ortadan kaldırır.
+  private const string FixedWindowLuaScript = """
         local current = redis.call('INCR', KEYS[1])
         if tonumber(current) == 1 then
             redis.call('EXPIRE', KEYS[1], ARGV[1])
@@ -43,7 +43,13 @@ public class RedisRateLimitingMiddleware(
         return { current, ttl }
         """;
 
-    private readonly int _permitLimit = configuration.GetValue("RateLimiting:PermitLimit", 20);
+  // Bir kullanıcı (veya IP adresi) 60 saniye içinde en fazla 5 istek atabilir.
+  // KEYS[1]: Kullanıcının kimliği (örneğin: rate_limit:192.168.1.5)
+  // ARGV[1]: Zaman penceresinin süresi (örneğin: 60 saniye)
+  
+
+
+  private readonly int _permitLimit = configuration.GetValue("RateLimiting:PermitLimit", 20);
     private readonly int _windowSeconds = configuration.GetValue("RateLimiting:WindowSeconds", 10);
 
     public async Task InvokeAsync(HttpContext context)
