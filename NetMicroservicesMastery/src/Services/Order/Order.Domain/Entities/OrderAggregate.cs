@@ -50,6 +50,8 @@ public class OrderAggregate
         };
     }
 
+
+  
     // ==================== Saga Pattern — Durum Geçişleri ====================
 
     /// <summary>Saga başlatıldı, stok rezervasyonu bekleniyor.</summary>

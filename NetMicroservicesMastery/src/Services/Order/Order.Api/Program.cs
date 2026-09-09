@@ -316,6 +316,21 @@ app.MapPost("/submit-order", async (SubmitOrderRequest request, IMediator mediat
     });
 });
 
+
+app.MapPost("/submit-order-with-partitionKey", async (SubmitOrderRequestWithPartitionKey request, IMediator mediator) =>
+{
+    var command = new CreateOrderCommandWithPartitionKey(request.PartitionKey, request.CustomerId, request.TotalAmount, request.OrderId);
+    var result = await mediator.Send(command);
+
+    return Results.Accepted(value: new
+    {
+        orderId = result.OrderId,
+        eventTopic = KafkaTopics.OrderCreated,
+        commandTopic = KafkaTopics.ProcessPaymentCommand
+    });
+});
+
+
 // =====================================================================
 // Modül 4: Outbox Pattern — DEDİKE DEMO/TEST endpoint'i
 // "/submit-order"dan BİLİNÇLİ olarak ayrı tutuldu — DB yazımı ile mesaj
