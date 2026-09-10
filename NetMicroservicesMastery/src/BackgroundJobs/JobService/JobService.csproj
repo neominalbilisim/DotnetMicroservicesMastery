@@ -11,6 +11,7 @@
     <PackageReference Include="Hangfire.Core" Version="1.8.14" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
+    <PackageReference Include="TimeZoneConverter" Version="7.2.0" />
     <!-- NOT: StackExchange.Redis / RedLock.net artık BuildingBlocks.Resilience
          üzerinden (IDistributedLockService) transitif olarak geliyor. -->
   </ItemGroup>
