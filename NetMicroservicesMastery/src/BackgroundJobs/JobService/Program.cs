@@ -155,4 +155,12 @@ app.MapPost("/jobs/delayed", (IBackgroundJobClient jobClient) =>
     return Results.Ok(new { jobId, type = "delayed", delay = delay.ToString(), note = "30 saniye sonra çalışacak. Dashboard: /hangfire" });
 });
 
+app.MapPost("/jobs/continuations", (IBackgroundJobClient jobClient) =>
+{
+    // Continuation: önceki job tamamlandıktan SONRA kuyruğa alınır.
+    var parentJobId = jobClient.Enqueue<IReportJob>("critical", job => job.RunAsync(CancellationToken.None));
+    var continuationJobId = jobClient.ContinueJobWith<IReportJob>(parentJobId, job => job.RunAsync(CancellationToken.None));
+    return Results.Ok(new { parentJobId, continuationJobId, type = "continuation", note = "Parent job tamamlandıktan sonra çalışacak. Dashboard: /hangfire" });
+});
+
 app.Run();
